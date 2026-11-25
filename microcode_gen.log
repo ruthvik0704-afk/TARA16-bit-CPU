@@ -1,0 +1,107 @@
+TARA control ROM generator (TH6)
+ROM: 2048 words x 32 bits, address = {Z, N, OPCODE[4:0], TSTATE[3:0]}
+
+Control word layout
+  bits 2-0    BUS_SOURCE
+  bits 5-4    PC_CTRL
+  bits 7      MAR_LOAD
+  bits 8      MDR_LOAD
+  bits 9      IR_LOAD
+  bits 10     ACC_LOAD
+  bits 11     RF_WRITE
+  bits 12     MEM_READ
+  bits 13     MEM_WRITE
+  bits 18-14  ALU_SELECT
+  bits 19     STATUS_WE
+  bits 20     STEP_RESET
+  bits 21     HALT
+  bits 22     ALU_SRC_IMM
+  bits 23     IMM_SEL
+  bits 25-24  RA_SEL
+  bits 27-26  WR_SEL
+  bits 28     B_CONST
+  bits 29     CONST_SEL
+  bits 30     BYTE_SEL
+  bits 3, 6, 31 unused
+
+Microprogram (identical for all four Z/N combinations except where shown)
+  fetch       T0  00000081  bus=PC, MAR_LOAD
+  fetch       T1  00001113  bus=MEM, PC+2, MDR_LOAD, MEM_READ
+  fetch       T2  00000202  bus=MDR, IR_LOAD
+   0 NOP      T3  00100000  STEP_RESET
+   1 HLT      T3  00200000  HALT
+   2 MOV      T3  00100804  bus=QA, RF_WRITE, STEP_RESET
+   3 LIL      T3  00100807  bus=IMM, RF_WRITE, STEP_RESET
+   4 LIH      T3  00410400  ALU=LIH, ACC_LOAD, ALU_SRC_IMM
+   4 LIH      T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+   5 LDW      T3  00c24400  ALU=ADD, ACC_LOAD, ALU_SRC_IMM, IMM_SEL
+   5 LDW      T4  00000086  bus=ACC, MAR_LOAD
+   5 LDW      T5  00001103  bus=MEM, MDR_LOAD, MEM_READ
+   5 LDW      T6  00100802  bus=MDR, RF_WRITE, STEP_RESET
+   6 STW      T3  00c24400  ALU=ADD, ACC_LOAD, ALU_SRC_IMM, IMM_SEL
+   6 STW      T4  00000086  bus=ACC, MAR_LOAD
+   6 STW      T5  01102004  bus=QA, portA=RD, MEM_WRITE, STEP_RESET
+   7 LDB      T3  00c24400  ALU=ADD, ACC_LOAD, ALU_SRC_IMM, IMM_SEL
+   7 LDB      T4  00000086  bus=ACC, MAR_LOAD
+   7 LDB      T5  40001103  bus=MEM, MDR_LOAD, MEM_READ, BYTE_SEL
+   7 LDB      T6  00100802  bus=MDR, RF_WRITE, STEP_RESET
+   8 STB      T3  00c24400  ALU=ADD, ACC_LOAD, ALU_SRC_IMM, IMM_SEL
+   8 STB      T4  00000086  bus=ACC, MAR_LOAD
+   8 STB      T5  41102004  bus=QA, portA=RD, MEM_WRITE, STEP_RESET, BYTE_SEL
+   9 ADD      T3  000a4400  ALU=ADD, ACC_LOAD, STATUS_WE
+   9 ADD      T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  10 SUB      T3  000a8400  ALU=SUB, ACC_LOAD, STATUS_WE
+  10 SUB      T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  11 ADDI     T3  004a4400  ALU=ADD, ACC_LOAD, STATUS_WE, ALU_SRC_IMM
+  11 ADDI     T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  13 AND      T3  000b4400  ALU=AND, ACC_LOAD, STATUS_WE
+  13 AND      T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  14 OR       T3  000b8400  ALU=OR, ACC_LOAD, STATUS_WE
+  14 OR       T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  15 XOR      T3  000bc400  ALU=XOR, ACC_LOAD, STATUS_WE
+  15 XOR      T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  16 NOT      T3  000c0400  ALU=NOT, ACC_LOAD, STATUS_WE
+  16 NOT      T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  17 SHL      T3  004c4400  ALU=SHL, ACC_LOAD, STATUS_WE, ALU_SRC_IMM
+  17 SHL      T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  18 SHR      T3  004c8400  ALU=SHR, ACC_LOAD, STATUS_WE, ALU_SRC_IMM
+  18 SHR      T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  19 SLT      T3  000cc400  ALU=SLT, ACC_LOAD, STATUS_WE
+  19 SLT      T4  00100806  bus=ACC, RF_WRITE, STEP_RESET
+  20 BZ       T3  110a4000  ALU=ADD, portA=RD, STATUS_WE, B_CONST
+  20 BZ       T4  00100020  Z=1: PC<-target, STEP_RESET
+  20 BZ       T4  00100000  Z=0: STEP_RESET
+  21 BN       T3  110a4000  ALU=ADD, portA=RD, STATUS_WE, B_CONST
+  21 BN       T4  00100020  N=1: PC<-target, STEP_RESET
+  21 BN       T4  00100000  N=0: STEP_RESET
+  22 JMP      T3  00100020  PC<-target, STEP_RESET
+  23 CALL     T3  04100821  bus=PC, PC<-target, write=R6, RF_WRITE, STEP_RESET
+  24 RET      T3  02100034  bus=QA, PC<-bus, portA=R6, STEP_RESET
+  25 PUSH     T3  33028400  ALU=SUB, portA=R7, ACC_LOAD, B_CONST, CONST_SEL
+  25 PUSH     T4  08000886  bus=ACC, write=R7, MAR_LOAD, RF_WRITE
+  25 PUSH     T5  01102004  bus=QA, portA=RD, MEM_WRITE, STEP_RESET
+  26 POP      T3  03000084  bus=QA, portA=R7, MAR_LOAD
+  26 POP      T4  00001803  bus=MEM, RF_WRITE, MEM_READ
+  26 POP      T5  33024400  ALU=ADD, portA=R7, ACC_LOAD, B_CONST, CONST_SEL
+  26 POP      T6  08100806  bus=ACC, write=R7, RF_WRITE, STEP_RESET
+  all other addresses: 00100000  STEP_RESET
+
+Consistency checks
+  [PASS] 1. no control word selects more than one bus source
+         BUS_SOURCE is a 3-bit encoded field decoded to one-hot enables, so two sources cannot be selected; all codes are valid and unused bits are 0
+  [PASS] 2. every implemented instruction eventually asserts STEP_RESET or HALT
+         26 instructions checked; longest takes 7 states
+  [PASS] 3. MEM_READ and MEM_WRITE are never asserted simultaneously
+         2048 words checked
+  [PASS] 4. write enables are never asserted without valid source data
+         bus-driven loads, memory, PC, ACC, flags, WR_SEL, BYTE_SEL and HALT words checked
+  [PASS] 5. conditional-branch words differ only in the relevant condition signal
+         conditional opcodes: BZ, BN; first execute state latches flags and the taken word differs only in PC_CTRL
+  [PASS] 6. no undefined opcode can modify architectural state
+         6 undefined opcodes (12, 27, 28, 29, 30, 31, including MUL = 12): after the common fetch every state is the safe step-reset word
+
+Comparison with the ROM in the circuit file
+  [PASS] 0 of 2048 words differ
+
+RESULT: all checks passed
+Wrote control_rom.hex (2048 words)
